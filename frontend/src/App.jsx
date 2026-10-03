@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Cpu, Play, RotateCcw, Plus, Trash2, BarChart3, MemoryStick, CheckCircle2, AlertTriangle } from "lucide-react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL || "https://memory-allocation-simulator-3.onrender.com";
 
 const initialBlocks = [100, 500, 200, 300, 600];
 const initialProcesses = [212, 417, 112, 426];
@@ -50,7 +50,7 @@ function App() {
       ]);
       setComparison(all);
     } catch (e) {
-      setError(`${e.message}. Make sure the backend is running on port 5000.`);
+      setError(`${e.message}. Unable to reach the backend service.`);
     } finally {
       setLoading(false);
     }
