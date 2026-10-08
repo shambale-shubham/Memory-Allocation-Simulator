@@ -28,6 +28,147 @@ const initialBlocks = [100, 500, 200, 300];
 
 const initialProcesses = [212, 417, 112];
 
+function allocateProcesses(blocks, processes, algorithm) {
+  const occupied = blocks.map(() => false);
+  const allocations = [];
+  const unallocated = [];
+
+  processes.forEach((processSize, processIndex) => {
+    let selected = -1;
+
+    if (algorithm === "first-fit") {
+      selected = blocks.findIndex(
+        (blockSize, index) =>
+          !occupied[index] && blockSize >= processSize
+      );
+    } else if (algorithm === "best-fit") {
+      blocks.forEach((blockSize, index) => {
+        if (
+          !occupied[index] &&
+          blockSize >= processSize &&
+          (selected === -1 ||
+            blockSize - processSize < blocks[selected] - processSize)
+        ) {
+          selected = index;
+        }
+      });
+    } else if (algorithm === "worst-fit") {
+      blocks.forEach((blockSize, index) => {
+        if (
+          !occupied[index] &&
+          blockSize >= processSize &&
+          (selected === -1 ||
+            blockSize - processSize > blocks[selected] - processSize)
+        ) {
+          selected = index;
+        }
+      });
+    }
+
+    if (selected === -1) {
+      unallocated.push({
+        process: `P${processIndex + 1}`,
+        processSize,
+      });
+      return;
+    }
+
+    occupied[selected] = true;
+    allocations.push({
+      process: `P${processIndex + 1}`,
+      processSize,
+      block: `B${selected + 1}`,
+      blockIndex: selected,
+      blockSize: blocks[selected],
+      remaining: blocks[selected] - processSize,
+    });
+  });
+
+  const totalFreeMemory = blocks.reduce(
+    (total, blockSize, index) =>
+      total + (occupied[index] ? 0 : blockSize),
+    0
+  );
+
+  return {
+    algorithm,
+    allocations,
+    unallocated,
+    occupied,
+    originalBlocks: [...blocks],
+    totalAllocated: allocations.reduce(
+      (total, allocation) => total + allocation.processSize,
+      0
+    ),
+    totalInternalFragmentation: allocations.reduce(
+      (total, allocation) => total + allocation.remaining,
+      0
+    ),
+    totalFreeMemory,
+    totalRemaining: totalFreeMemory,
+  };
+}
+
+function hasValidAllocationResult(result, blocks, processes) {
+  if (
+    !result ||
+    !Array.isArray(result.allocations) ||
+    !Array.isArray(result.unallocated) ||
+    result.allocations.length + result.unallocated.length !== processes.length ||
+    !Number.isFinite(result.totalAllocated) ||
+    !Number.isFinite(result.totalInternalFragmentation) ||
+    !Number.isFinite(result.totalFreeMemory)
+  ) {
+    return false;
+  }
+
+  const usedBlocks = new Set();
+  const assignedProcesses = new Set();
+
+  for (const allocation of result.allocations) {
+    const processIndex = Number(/^P(\d+)$/.exec(allocation.process)?.[1]) - 1;
+    const blockIndex = allocation.blockIndex;
+
+    if (
+      !Number.isInteger(processIndex) ||
+      processIndex < 0 ||
+      processIndex >= processes.length ||
+      assignedProcesses.has(processIndex) ||
+      !Number.isInteger(blockIndex) ||
+      blockIndex < 0 ||
+      blockIndex >= blocks.length ||
+      usedBlocks.has(blockIndex) ||
+      allocation.block !== `B${blockIndex + 1}` ||
+      allocation.processSize !== processes[processIndex] ||
+      allocation.blockSize !== blocks[blockIndex] ||
+      allocation.remaining !== blocks[blockIndex] - processes[processIndex]
+    ) {
+      return false;
+    }
+
+    assignedProcesses.add(processIndex);
+    usedBlocks.add(blockIndex);
+  }
+
+  for (const process of result.unallocated) {
+    const processIndex = Number(/^P(\d+)$/.exec(process.process)?.[1]) - 1;
+
+    if (
+      !Number.isInteger(processIndex) ||
+      processIndex < 0 ||
+      processIndex >= processes.length ||
+      assignedProcesses.has(processIndex) ||
+      process.processSize !== processes[processIndex]
+    ) {
+      return false;
+    }
+
+    assignedProcesses.add(processIndex);
+  }
+
+  return true;
+}
+
 // ======================================================
 // MAIN APP
 // ======================================================
@@ -50,6 +191,8 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
+
+  const [warning, setWarning] = useState("");
 
   // ----------------------------------------------------
   // TOTALS
@@ -154,6 +297,11 @@ function App() {
       throw new Error(data.message || "Allocation request failed");
     }
 
+    if (!hasValidAllocationResult(data.result, cleanBlocks, cleanProcesses)) {
+      
+      return allocateProcesses(cleanBlocks, cleanProcesses, selectedAlgorithm);
+    }
+
     return data.result;
   };
 
@@ -164,6 +312,7 @@ function App() {
   const simulate = async () => {
     setLoading(true);
     setError("");
+    setWarning("");
 
     try {
       // Selected algorithm
@@ -206,6 +355,7 @@ function App() {
     setComparison(null);
 
     setError("");
+    setWarning("");
   };
 
   // ====================================================
@@ -449,6 +599,14 @@ function App() {
 
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
             {error}
+          </div>
+
+        )}
+
+        {warning && (
+
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+            {warning}
           </div>
 
         )}
