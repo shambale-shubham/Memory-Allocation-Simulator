@@ -24,9 +24,9 @@ const API =
 // DEFAULT DATA
 // ======================================================
 
-const initialBlocks = [100, 500, 200, 300, 600];
+const initialBlocks = [100, 500, 200, 300];
 
-const initialProcesses = [212, 417, 112, 426];
+const initialProcesses = [212, 417, 112];
 
 // ======================================================
 // MAIN APP
@@ -462,7 +462,7 @@ function App() {
           <>
 
             {/* =================================================
-                MEMORY VISUALIZATION
+                MEMORY VISUALIZATION — ONE PROCESS PER BLOCK
             ================================================= */}
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -476,7 +476,7 @@ function App() {
                   </h2>
 
                   <p className="text-sm text-slate-400">
-                    {algorithmLabels[result.algorithm]} allocation result
+                    {algorithmLabels[result.algorithm]} allocation result (One process per block)
                   </p>
 
                 </div>
@@ -485,37 +485,31 @@ function App() {
 
               </div>
 
-              {/* =================================================
-                  MEMORY BLOCKS
-              ================================================= */}
-
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 
                 {blocks.map((size, index) => {
 
                   const blockSize = Number(size);
 
-                  // IMPORTANT:
-                  // Get every process allocated inside this block.
-                  const blockAllocations =
-                    result.allocations.filter(
-                      (allocation) =>
-                        allocation.blockIndex === index
+                  // Find the SINGLE allocation in this block
+                  // (Backend only allows one process per block)
+                  const allocation =
+                    result.allocations.find(
+                      (a) => a.blockIndex === index
                     );
 
-                  // Calculate total used memory
-                  const used = blockAllocations.reduce(
-                    (total, allocation) =>
-                      total +
-                      Number(allocation.processSize),
-                    0
-                  );
+                  // Used memory = process size (0 if block is free)
+                  const used = allocation
+                    ? Number(allocation.processSize)
+                    : 0;
 
-                  // Calculate remaining memory
-                  const remaining = Math.max(
-                    0,
-                    blockSize - used
-                  );
+                  // Internal fragmentation = wasted space (only if allocated)
+                  const internalFrag = allocation
+                    ? blockSize - used
+                    : 0;
+
+                  // Free space (only if block is completely free)
+                  const freeSpace = allocation ? 0 : blockSize;
 
                   return (
 
@@ -544,61 +538,61 @@ function App() {
 
                       <div className="flex h-10 w-full overflow-hidden rounded-lg bg-slate-800">
 
-                        {/* PROCESS SEGMENTS */}
+                        {/* PROCESS SEGMENT (only one allowed) */}
 
-                        {blockAllocations.map(
-                          (allocation, allocationIndex) => {
+                        {allocation && (
 
-                            const processSize =
-                              Number(
-                                allocation.processSize
-                              );
+                          <div
+                            className="flex items-center justify-center border-r border-slate-950 bg-indigo-600 px-1 text-xs font-bold text-white transition hover:bg-indigo-500"
+                            style={{
+                              width: `${(used / blockSize) * 100}%`,
+                              minWidth: "50px",
+                            }}
+                            title={`${allocation.process}: ${used} KB`}
+                          >
 
-                            const width =
-                              (processSize /
-                                blockSize) *
-                              100;
+                            <span>
+                              {allocation.process}
+                            </span>
 
-                            return (
+                          </div>
 
-                              <div
-                                key={`${allocation.process}-${allocationIndex}`}
-                                className="flex items-center justify-center border-r border-slate-950 bg-indigo-600 px-1 text-xs font-bold text-white transition hover:bg-indigo-500"
-                                style={{
-                                  width: `${width}%`,
-                                  minWidth: "50px",
-                                }}
-                                title={`${allocation.process}: ${processSize} KB`}
-                              >
-
-                                <span>
-                                  {allocation.process}
-                                </span>
-
-                              </div>
-
-                            );
-                          }
                         )}
 
-                        {/* REMAINING MEMORY */}
+                        {/* INTERNAL FRAGMENTATION (wasted space in used block) */}
 
-                        {remaining > 0 && (
+                        {allocation && internalFrag > 0 && (
 
                           <div
                             className="flex items-center justify-center bg-slate-700 text-xs font-semibold text-slate-300"
                             style={{
-                              width: `${
-                                (remaining /
-                                  blockSize) *
-                                100
-                              }%`,
+                              width: `${(internalFrag / blockSize) * 100}%`,
                             }}
-                            title={`Remaining: ${remaining} KB`}
+                            title={`Internal Fragmentation: ${internalFrag} KB`}
                           >
 
-                            {remaining >= 50
-                              ? `${remaining} KB`
+                            {internalFrag >= 50
+                              ? `${internalFrag} KB`
+                              : ""}
+
+                          </div>
+
+                        )}
+
+                        {/* FREE BLOCK (no allocation) */}
+
+                        {!allocation && freeSpace > 0 && (
+
+                          <div
+                            className="flex items-center justify-center bg-slate-700 text-xs font-semibold text-slate-300"
+                            style={{
+                              width: "100%",
+                            }}
+                            title={`Free: ${freeSpace} KB`}
+                          >
+
+                            {freeSpace >= 50
+                              ? `${freeSpace} KB`
                               : ""}
 
                           </div>
@@ -607,52 +601,51 @@ function App() {
 
                       </div>
 
-                      {/* =================================================
-                          PROCESS DETAILS
-                      ================================================= */}
+                      {/* PROCESS DETAILS */}
 
-                      {blockAllocations.length > 0 && (
+                      {allocation && (
 
                         <div className="mt-3 space-y-1">
 
-                          {blockAllocations.map(
-                            (allocation, allocationIndex) => (
+                          <div className="flex items-center justify-between rounded-md bg-slate-900 px-2 py-1 text-xs">
 
-                              <div
-                                key={`${allocation.process}-detail-${allocationIndex}`}
-                                className="flex items-center justify-between rounded-md bg-slate-900 px-2 py-1 text-xs"
-                              >
+                            <span className="font-semibold text-indigo-300">
+                              {allocation.process}
+                            </span>
 
-                                <span className="font-semibold text-indigo-300">
-                                  {allocation.process}
-                                </span>
+                            <span className="text-slate-400">
+                              {allocation.processSize} KB
+                            </span>
 
-                                <span className="text-slate-400">
-                                  {allocation.processSize} KB
-                                </span>
-
-                              </div>
-
-                            )
-                          )}
+                          </div>
 
                         </div>
 
                       )}
 
                       {/* =================================================
-                          REMAINING
+                          STATUS
                       ================================================= */}
 
-                      <p className="mt-3 text-xs text-slate-400">
+                      {allocation ? (
 
-                        Remaining:{" "}
+                        <p className="mt-3 text-xs text-slate-400">
+                          Internal Fragmentation:{" "}
+                          <b className="text-amber-400">
+                            {internalFrag} KB
+                          </b>
+                        </p>
 
-                        <b className="text-emerald-400">
-                          {remaining} KB
-                        </b>
+                      ) : (
 
-                      </p>
+                        <p className="mt-3 text-xs text-slate-400">
+                          Block Free:{" "}
+                          <b className="text-emerald-400">
+                            {blockSize} KB
+                          </b>
+                        </p>
+
+                      )}
 
                     </div>
 
@@ -690,11 +683,24 @@ function App() {
 
               <Stat
                 icon={<MemoryStick />}
-                title="Remaining"
-                value={`${result.totalRemaining} KB`}
+                title="Internal Fragmentation"
+                value={`${result.totalInternalFragmentation ?? 0} KB`}
               />
 
             </section>
+
+            {/* =================================================
+                FREE MEMORY NOTE
+            ================================================= */}
+
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300">
+
+              Free Memory (unused blocks):{" "}
+              <b>
+                {result.totalFreeMemory ?? result.totalRemaining ?? 0} KB
+              </b>
+
+            </div>
 
             {/* =================================================
                 ALLOCATION DETAILS
@@ -735,7 +741,7 @@ function App() {
                       </th>
 
                       <th className="p-4 text-left">
-                        Remaining
+                        Internal Frag.
                       </th>
 
                     </tr>
@@ -770,7 +776,7 @@ function App() {
                             {allocation.blockSize} KB
                           </td>
 
-                          <td className="p-4 font-semibold text-emerald-400">
+                          <td className="p-4 font-semibold text-amber-400">
                             {allocation.remaining} KB
                           </td>
 
@@ -897,11 +903,21 @@ function App() {
 
                         <p className="flex justify-between">
                           <span>
-                            Remaining:
+                            Internal Frag.:
                           </span>
 
                           <b className="text-white">
-                            {item.totalRemaining} KB
+                            {item.totalInternalFragmentation ?? 0} KB
+                          </b>
+                        </p>
+
+                        <p className="flex justify-between">
+                          <span>
+                            Free Memory:
+                          </span>
+
+                          <b className="text-white">
+                            {item.totalFreeMemory ?? item.totalRemaining ?? 0} KB
                           </b>
                         </p>
 
