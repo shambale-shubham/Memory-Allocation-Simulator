@@ -141,10 +141,7 @@ function allocate(blocks, processes, algorithm) {
 // ======================================================
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "Memory Allocation API is running (one process per block)",
-  });
+  res.json({ success: true, message: "Memory Allocation API is running" });
 });
 
 // ======================================================
@@ -156,35 +153,21 @@ app.post("/api/allocate", (req, res) => {
     const { blocks, processes, algorithm } = req.body;
 
     if (!Array.isArray(blocks) || !Array.isArray(processes)) {
-      return res
-        .status(400)
-        .json({ message: "blocks and processes must be arrays" });
+      return res.status(400).json({ message: "blocks and processes must be arrays" });
     }
 
-    const validBlocks = blocks
-      .map(Number)
-      .filter((n) => Number.isFinite(n) && n > 0);
-
-    const validProcesses = processes
-      .map(Number)
-      .filter((n) => Number.isFinite(n) && n > 0);
+    const validBlocks = blocks.map(Number).filter(n => Number.isFinite(n) && n > 0);
+    const validProcesses = processes.map(Number).filter(n => Number.isFinite(n) && n > 0);
 
     if (!validBlocks.length || !validProcesses.length) {
-      return res
-        .status(400)
-        .json({ message: "Provide valid memory blocks and processes" });
+      return res.status(400).json({ message: "Provide valid memory blocks and processes" });
     }
 
     if (!["first-fit", "best-fit", "worst-fit"].includes(algorithm)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid allocation algorithm" });
+      return res.status(400).json({ message: "Invalid allocation algorithm" });
     }
 
-    res.json({
-      success: true,
-      result: allocate(validBlocks, validProcesses, algorithm),
-    });
+    res.json({ success: true, result: allocate(validBlocks, validProcesses, algorithm) });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -195,7 +178,5 @@ app.post("/api/allocate", (req, res) => {
 // ======================================================
 
 app.listen(PORT, () => {
-  console.log(
-    `Memory Allocation API running at http://localhost:${PORT}`
-  );
+  console.log(`Memory Allocation API running at http://localhost:${PORT}`);
 });
